@@ -10,9 +10,10 @@ This PowerShell script will prompt the details of the connection and read the Pe
 This file contains the queries to be executed. 
 The format needs to be the following:
 
-## First Line needs to contains the text -- and not more of 20 characters that will use for the CSV file name
-## Second line will be the TSQL query to be executed that needs to be finished by the delimiter # . Following you have some examples:
-  --ConfINSLevel  
+- **First Line needs to contains the text -- and not more of 20 characters that will use for the CSV file name**
+- **Second line will be the TSQL query to be executed that needs to be finished by the delimiter # . Following you have some examples:**
+
+   --ConfINSLevel  
    select * from sys.configurations#
    
   --ConfDBLEVEL
