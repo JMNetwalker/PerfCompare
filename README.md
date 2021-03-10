@@ -11,29 +11,13 @@ The format needs to be the following:
 ## Second line will be the TSQL query to be executed that needs to be finished by the delimiter # . Following you have some examples:
   --ConfINSLevel  
    select * from sys.configurations#
+   
   --ConfDBLEVEL
      select * from sys.databases#
-   --RowsAndSizePerTable
-   SELECT 
-      t.NAME AS TableName,
-      s.Name AS SchemaName,
-      p.rows AS RowCounts,
-      SUM(a.total_pages) * 8 AS TotalSpaceKB, 
-      SUM(a.used_pages) * 8 AS UsedSpaceKB, 
-      (SUM(a.total_pages) - SUM(a.used_pages)) * 8 AS UnusedSpaceKB
-   FROM 
-    sys.tables t
-    INNER JOIN      
-      sys.indexes i ON t.OBJECT_ID = i.object_id
-    INNER JOIN 
-       sys.partitions p ON i.object_id = p.OBJECT_ID AND i.index_id = p.index_id
-    INNER JOIN 
-       sys.allocation_units a ON p.partition_id = a.container_id
-    LEFT OUTER JOIN 
-       sys.schemas s ON t.schema_id = s.schema_id
-    WHERE t.is_ms_shipped = 0
-    AND i.OBJECT_ID > 255 
-    GROUP BY 
-       t.Name, s.Name, p.Rows 
-    ORDER BY 
-       t.Name#
+     
+  --Statistics
+   SELECT sp.stats_id, object_name(sp.object_id) as TableName, name, filter_definition, last_updated, rows, rows_sampled, steps, unfiltered_rows, modification_counter   
+   FROM sys.stats AS stat   
+   CROSS APPLY sys.dm_db_stats_properties(stat.object_id, stat.stats_id) AS sp#
+   
+   
