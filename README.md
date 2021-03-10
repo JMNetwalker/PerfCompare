@@ -1,6 +1,9 @@
-# PerfCompare
+# Background
 We found in many cases that we have different performance for same databases running in different SQL Instance. In multiple situations we could find that the differences are coming from different configuration, missing indexes, different workload, statistics, etc.. 
-The main idea is to collect the results of relevant queries and save them in CSV file to compare the results.
+
+# PerfCompare.Ps1
+The main idea is to collect the results of relevant queries and save them in CSV file to compare the results, running this script. 
+This PowerShell script will prompt the details of the connection and read the Perf_Instruc.SQL file creating a file per query, log file that contains all the operations and compressing everything in a zip file.
 
 # PERF_Instruct.SQL
 
