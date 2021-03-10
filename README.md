@@ -9,10 +9,10 @@ The format needs to be the following:
 
 ## First Line needs to contains the text -- and not more of 20 characters that will use for the CSV file name
 ## Second line will be the TSQL query to be executed that needs to be finished by the delimiter # . Following you have some examples:
-  --ConfINSLevel
+  --ConfINSLevel  
    select * from sys.configurations#
   --ConfDBLEVEL
-    select * from sys.databases#
+     select * from sys.databases#
    --RowsAndSizePerTable
    SELECT 
       t.NAME AS TableName,
