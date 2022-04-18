@@ -60,3 +60,9 @@ ON dm_mig.index_handle = dm_mid.index_handle#
 --SysInfo
 select * from sys.dm_os_sys_info#
 
+--SysNodes
+select * from sys.dm_os_nodes#
+
+--SysSchedulers
+select * from sys.dm_os_schedulers#
+
