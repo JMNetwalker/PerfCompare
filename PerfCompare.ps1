@@ -5,11 +5,92 @@
 #----------------------------------------------------------------
 #Parameters 
 #----------------------------------------------------------------
-param($server = "", #ServerName parameter to connect 
-      $user = "",                          #UserName parameter  to connect
-      $passwordSecure = "",              #Password Parameter  to connect
-      $Db = "",                       #DBName Parameter  to connect
-      $Folder = "C:\PERF_Collector")               #Folder Paramater to save the csv files 
+param($server = "",                       #ServerName parameter to connect 
+      $user = "",                         #UserName parameter  to connect
+      $passwordSecure = "",               #Password Parameter  to connect
+      $Db = "",                           #DBName Parameter  to connect
+      $Folder = "")                       #Folder Paramater to save the csv files 
+
+#----------------------------------------------------------------
+#Function to connect to the database using a retry-logic
+#----------------------------------------------------------------
+
+Function GiveMeConnectionSource()
+{ 
+  for ($i=1; $i -lt 10; $i++)
+  {
+   try
+    {
+      logMsg( "Connecting to the database...Attempt #" + $i) (1)
+      logMsg( "Connecting to server: " + $server + " - DB: " + $Db) (1)
+
+      $SQLConnection = New-Object System.Data.SqlClient.SqlConnection 
+      $SQLConnection.ConnectionString = "Server="+$server+";Database="+$Db+";User ID="+$user+";Password="+$password+";Connection Timeout=60;Application Name=PerfCompare" 
+      $SQLConnection.Open()
+      logMsg("Connected to the database...") (1)
+      return $SQLConnection
+      break;
+    }
+  catch
+   {
+    logMsg("Not able to connect - Retrying the connection..." + $Error[0].Exception) (2)
+    Start-Sleep -s 5
+   }
+  }
+}
+
+
+#-------------------------------------------------------------------------
+#Function to obtain the location of ERRORLOG and copy the files to folder 
+#-------------------------------------------------------------------------
+
+Function TakeAllErrorLog($FolderDestination)
+{ 
+   try
+    {
+   
+      $SQLConnectionSource = GiveMeConnectionSource  #Connecting to the database.
+      if($SQLConnectionSource -eq $null)
+      { 
+        logMsg("It is not possible to connect to the database") (2)
+        break;
+      }
+
+      $command = New-Object -TypeName System.Data.SqlClient.SqlCommand
+      $command.CommandTimeout = 6000
+      $command.Connection=$SQLConnectionSource
+      $command.CommandText = "SELECT SERVERPROPERTY('ErrorLogFileName') AS 'Error log file location'"
+      $Reader = $command.ExecuteReader()
+
+      while($Reader.Read())
+      {
+       logMsg("----- File Location: " + $Reader.GetValue(0) ) 
+       $Folder = $Reader.GetValue(0)
+      }
+
+      $SQLConnectionSource.Close()
+
+      if(TestEmpty($Folder)) 
+      {
+        logMsg("----- Log Folder is empty" ) (2)
+        exit;
+      }
+
+      $ErrorLogFolder = @(Get-ChildItem -Path $Folder)
+      ForEach($ErrorLogFile in $ErrorLogFolder)
+      {
+        $sDestination = $FolderDestination + "\" + $ErrorLogFile.Name + ".LOG"
+        DeleteFile($sDestination) | out-null
+        logMsg("----- Copy the file " + $ErrorLogFile.Name ) 
+        Copy-Item $ErrorLogFile -Destination $sDestination | out-null
+      }
+
+    }
+  catch
+   {
+    logMsg("Not able to run the errorlog file.." + $Error[0].Exception) (2)
+   }
+}
 
 #--------------------------------------------------------------
 #Create a folder 
@@ -38,7 +119,7 @@ Function CreateFolder
  }
 
 #-------------------------------
-#Create a folder 
+#delete a file 
 #-------------------------------
 Function DeleteFile{ 
   Param( [Parameter(Mandatory)]$FileName ) 
@@ -163,26 +244,6 @@ Param([Parameter(Mandatory=$true)]
   }
 }
 
-try
-{
-Clear
-
-#--------------------------------
-#Check the parameters.
-#--------------------------------
-
-if (TestEmpty($server)) { $server = read-host -Prompt "Please enter a Server Name" }
-if (TestEmpty($user))  { $user = read-host -Prompt "Please enter a User Name"   }
-if (TestEmpty($passwordSecure))  
-    {  
-    $passwordSecure = read-host -Prompt "Please enter a password"  -assecurestring  
-    $password = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($passwordSecure))
-    }
-else
-    {$password = $passwordSecure} 
-if (TestEmpty($Db))  { $Db = read-host -Prompt "Please enter a Database Name"  }
-if (TestEmpty($Folder)) {  $Folder = read-host -Prompt "Please enter a Destination Folder (Don't include the past \) - Example c:\Perf_Collector" }
-
 Function Remove-InvalidFileNameChars {
 
 param([Parameter(Mandatory=$true,
@@ -193,6 +254,52 @@ param([Parameter(Mandatory=$true,
 )
 
 return [RegEx]::Replace($Name, "[{0}]" -f ([RegEx]::Escape([String][System.IO.Path]::GetInvalidFileNameChars())), '')}
+
+try
+{
+Clear
+
+#--------------------------------
+#Check the parameters.
+#--------------------------------
+
+if (TestEmpty($server)) { $server = read-host -Prompt "Please enter a Server Name" }
+if (TestEmpty($server)) 
+   {
+    LogMsg("Please, specify the server") (2)
+    exit;
+   }
+if (TestEmpty($user))  { $user = read-host -Prompt "Please enter a User Name"   }
+if (TestEmpty($user)) 
+   {
+    LogMsg("Please, specify the user name") (2)
+    exit;
+   }
+if (TestEmpty($passwordSecure))  
+    {  
+    $passwordSecure = read-host -Prompt "Please enter a password"  -assecurestring  
+    $password = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($passwordSecure))
+    }
+else
+    {$password = $passwordSecure} 
+if (TestEmpty($password)) 
+   {
+    LogMsg("Please, specify the password") (2)
+    exit;
+   }
+if (TestEmpty($Db))  { $Db = read-host -Prompt "Please enter a Database Name - Leaving empty the database master will be used"  }
+if (TestEmpty($Db)) 
+   {
+    $DB = "master"
+    LogMsg("Using master as DB as default") (2)
+   }
+if (TestEmpty($Folder)) {  $Folder = read-host -Prompt "Please enter a Destination Folder (Don't include the past \) - Example c:\Perf_Compare" }
+if (TestEmpty($Folder)) 
+   {
+    $Folder = "C:\PERF_Compare"    
+    LogMsg("Using " + $Folder + " as default") (2)
+   }
+
 
 #--------------------------------
 #Run the process
@@ -221,6 +328,9 @@ logMsg("Deleted Log and Zip File") (1)
 logMsg("ServerName: " +$server) (1)
 logMsg("DB Name: "    +$DB) (1)
 logMsg("Reading the instruction file") (1)
+
+#Checking if the Instruct.SQL file exists
+
 $ExistFile= Test-Path $File
 if($ExistFile -eq 1)
    {
@@ -229,7 +339,7 @@ if($ExistFile -eq 1)
    }
 else
    {
-    logMsg("The file that contains the instuctions doesn't exist") (2)
+    logMsg("The file that contains the instructions doesn't exist") (2)
     exit;
    }
 logMsg("Read the instruction file") (1)  
@@ -259,17 +369,21 @@ logMsg("Processing the tables selected.." ) (1)
     $DBState = Invoke-Sqlcmd -ServerInstance $server -Database $DB -Query $ArrayQueries[$iQuery] -Username $user -Password $password -ConnectionTimeout 60 -QueryTimeout 60 | Select-Object *  | ConvertTo-CSV  | Out-File -filePath ($sFolderV + "Query_" + $FileName +".csv") -Encoding "UTF8"
  } 
 
+ #Reading the errorlog files
+ TakeAllErrorLog($sFolderV)
+
+ #Compressing the files
    Remove-Variable password
    logMsg("Zipping the content to " + $Zipfile) (1)
       $result = Compress-Archive -Path $Folder\*.log,$Folder\*.csv -DestinationPath $ZipFile
-   logMsg("Zipped the content to " + $Zipfile + "--" + $result )  (1)
-   logMsg("PERF Collector Script was executed correctly")  (1)
+   logMsg("Zipped the content to " + $Zipfile )  (1)
+   logMsg("PERF Compare Script was executed correctly")  (1)
 }
 catch
   {
-    logMsg("PERF Collector Script was executed incorrectly ..: " + $Error[0].Exception) (2)
+    logMsg("PERF Compare Script was executed incorrectly ..: " + $Error[0].Exception) (2)
   }
 finally
 {
-   logMsg("PERF Collector Script finished - Check the previous status line to know if it was success or not") (2)
+   logMsg("PERF Compare finished - Check the previous status line to know if it was success or not") (2)
 } 
